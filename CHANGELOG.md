@@ -8,6 +8,50 @@ Semua perubahan penting pada proyek ini dicatat di sini. Format mengikuti
 
 ### Added
 
+- **Installer NSIS**: NSIS dipasang (`scoop bucket add extras && scoop
+  install extras/nsis`), `wails.json` diisi field `info` (companyName,
+  productName, productVersion, copyright, comments -- sebelumnya kosong,
+  installer akan fallback ke default generik Wails termasuk placeholder
+  "Copyright........." literal kalau tidak diisi). `wails build -nsis`
+  menghasilkan `build/bin/latex-studio-amd64-installer.exe`, dikonfirmasi
+  metadata terisi benar lewat `Get-Item .VersionInfo` PADA FILE INSTALLER
+  (bukan `latex-studio.exe` biasa -- lihat catatan keterbatasan di
+  README.md/bawah).
+  - Dua artifact build ditemukan dan dibereskan lewat `git status` setelah
+    build pertama (bukan diasumsikan bersih): `wails_tools.nsh` ikut
+    ter-render jadi berisi nilai asli alih-alih placeholder template
+    (`{{.Info.CompanyName}}`, dst.) -- persis analog dengan binding
+    TypeScript yang sudah dicatat berulang kali di CHANGELOG ini,
+    dikembalikan ke bentuk template lewat `git checkout --` sebelum
+    commit, dan didokumentasikan di README.md sebagai langkah wajib
+    berulang. `build/windows/installer/tmp/` (bootstrapper WebView2
+    ~1.7MB yang diunduh saat build) ditambahkan ke `.gitignore`.
+  - **Batasan ditemukan lewat investigasi, bukan diklaim beres begitu
+    saja**: `latex-studio.exe` (BUKAN installer-nya) TIDAK menampilkan
+    metadata versi lewat PowerShell `Get-Item .VersionInfo`/.NET
+    `FileVersionInfo` (CompanyName/ProductName/dst. semua kosong) biar
+    pun sudah diisi lewat `wails.json` -- diinvestigasi sebelum
+    didokumentasikan sebagai batasan: string metadata yang sama
+    DIKONFIRMASI ADA UTUH di dalam binary lewat pencarian UTF-16 mentah
+    (`[System.Text.Encoding]::Unicode.GetString`), jadi bukan data yang
+    hilang, cuma tidak terbaca oleh satu API tertentu. Dugaan penyebab:
+    `build/windows/info.json` (scaffold default Wails, TIDAK diubah di
+    increment ini) memakai kunci bahasa `"0000"` (neutral, tanpa codepage
+    eksplisit) pada `tc-hib/winres`, yang tampaknya tidak dikenali
+    pembaca versi info .NET -- kemungkinan kuirk upstream Wails/winres,
+    bukan sesuatu yang diperkenalkan di sini. Installer-nya SENDIRI
+    (mekanisme berbeda, `VIAddVersionKey` eksplisit di `project.nsi`)
+    menampilkan metadata dengan benar lewat pembacaan yang sama --
+    dampak batasan ini kosmetik (tab Properti file `.exe` mentah di luar
+    installer), bukan fungsional. Belum dicoba diperbaiki.
+  - Percobaan menjalankan installer sampai selesai (verifikasi visual)
+    memicu prompt UAC (installer minta elevasi admin, default
+    `InstallDir` di `$PROGRAMFILES64`) -- SENGAJA TIDAK dicoba
+    dilewati/diklik otomatis, operator (Harits) yang membatalkan prompt
+    itu secara manual. Menjalankan installer sampai selesai untuk
+    verifikasi end-to-end (shortcut, uninstall, dst.) jadi tanggung
+    jawab operator, lihat ROADMAP.md.
+
 - **Autocomplete perintah LaTeX**: `frontend/src/main.js` menambah
   `latexCompletions`, `CompletionSource` `@codemirror/autocomplete` yang
   memicu popup saat kursor persis setelah backslash diikuti nol atau

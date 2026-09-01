@@ -180,6 +180,39 @@
       adalah pola resmi dari dokumentasi `@codemirror/autocomplete`,
       bukan logic custom yang rawan salah.
 
+## Installer (NSIS)
+
+- [x] NSIS terpasang (`scoop bucket add extras && scoop install
+      extras/nsis`) dan diverifikasi lewat `makensis /VERSION`.
+- [x] `wails.json` diisi field `info` (companyName, productName,
+      productVersion, copyright, comments) -- sebelumnya kosong, template
+      installer scaffold (`build/windows/installer/project.nsi`/
+      `wails_tools.nsh`) akan fallback ke default Wails yang generik
+      (nama proyek dobel jadi company name, placeholder
+      "Copyright........." literal) kalau tidak diisi.
+- [x] `wails build -nsis` menghasilkan
+      `build/bin/latex-studio-amd64-installer.exe` -- dikonfirmasi
+      metadata (CompanyName, ProductName, ProductVersion, LegalCopyright)
+      terisi benar lewat PowerShell `Get-Item .VersionInfo` pada FILE
+      INSTALLER-nya (bukan `latex-studio.exe` biasa, lihat catatan
+      keterbatasan di README.md soal itu).
+- [x] Template scaffold Wails yang ikut ter-render saat `-nsis` dibangun
+      (`build/windows/installer/wails_tools.nsh`, analog dengan binding
+      TypeScript yang sudah dicatat berulang kali di roadmap ini) DIKEMBALIKAN
+      ke bentuk template sebelum commit (`git checkout --`), dan artifact
+      unduhan build-time (`build/windows/installer/tmp/`, bootstrapper
+      WebView2 ~1.7MB) ditambahkan ke `.gitignore` -- keduanya ditemukan
+      lewat `git status` setelah build pertama, bukan diasumsikan bersih
+      begitu saja.
+- [ ] **Belum diverifikasi penuh**: menjalankan installer sampai selesai
+      (klik Next/Install) belum dicoba -- installer minta elevasi admin
+      (default `InstallDir` di `$PROGRAMFILES64`), memicu prompt UAC yang
+      SECARA SENGAJA tidak dicoba dilewati/diklik otomatis (itu wajib
+      persetujuan interaktif operator, bukan sesuatu yang boleh
+      diotomasi/di-skip oleh agent). Operator perlu menjalankan installer
+      sendiri untuk memverifikasi alur install/shortcut/uninstall
+      end-to-end -- lihat README.md bagian "Installer (NSIS)".
+
 ## Belum dikerjakan (di luar cakupan MVP ini)
 
 - [ ] **Multi-file project**: `\input`/`\include`, gambar/asset relatif,
@@ -212,6 +245,3 @@
       menampilkan dialog, butuh window OS sungguhan untuk
       `wailsruntime.OpenFileDialog`/`SaveFileDialog`, tidak bisa dipanggil
       dari `go test` biasa) masih belum ada test sama sekali.
-- [ ] Packaging installer (NSIS, sudah terdeteksi opsional oleh
-      `wails doctor` tapi belum dikonfigurasi) untuk distribusi di luar
-      `wails build` mentah.

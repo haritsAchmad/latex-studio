@@ -91,6 +91,32 @@ sed -i 's/[ \t]*$//' frontend/wailsjs/go/models.ts frontend/wailsjs/go/main/App.
 git diff --check   # harus tidak menghasilkan output apa pun (exit 0)
 ```
 
+**Sebelum commit setelah `wails build -nsis`**: `build/windows/installer/wails_tools.nsh`
+ikut di-RENDER Wails jadi berisi nilai asli (`INFO_COMPANYNAME`, dst.),
+padahal yang seharusnya di-commit adalah versi TEMPLATE-nya
+(`{{.Info.CompanyName}}`, dst.) -- `wails build -nsis` merender ulang
+file itu setiap kali dipanggil (sama seperti binding TypeScript di atas),
+jadi commit versi template lebih tahan lama/tidak basi dibanding
+hardcode nilai hasil render. Kembalikan sebelum commit:
+
+```bash
+git checkout -- build/windows/installer/wails_tools.nsh
+```
+
+## Installer (NSIS)
+
+```powershell
+scoop bucket add extras   # sekali saja
+scoop install extras/nsis
+wails build -nsis   # -> build/bin/latex-studio-amd64-installer.exe
+```
+
+Metadata installer (nama perusahaan/produk/versi/copyright) diambil dari
+field `info` di `wails.json`, bukan placeholder default Wails. Installer
+default minta elevasi admin (install ke `Program Files`) -- menjalankannya
+memicu prompt UAC yang wajib disetujui/dibatalkan operator secara
+interaktif, tidak bisa diotomasi/di-skip dengan cara apa pun.
+
 ## Save/open file
 
 Toolbar (Baru/Buka/Simpan/Simpan sebagai) dan keyboard shortcut standar
@@ -132,3 +158,17 @@ biar pun belum ada huruf setelah `\`.
   `Ensure`/`Compile`/`OpenDocument`/`SaveDocumentAs`/`ExportPDF` (bagian
   yang menampilkan dialog) masih belum ada
   automated test sama sekali, lihat ROADMAP.md.
+- **`latex-studio.exe` (BUKAN installer-nya) tidak menampilkan metadata
+  versi lewat PowerShell `Get-Item .VersionInfo`/.NET `FileVersionInfo`**
+  -- CompanyName/ProductName/dst. semua kosong biar pun sudah diisi lewat
+  `wails.json`. Dikonfirmasi BUKAN berarti datanya hilang: string yang
+  sama ditemukan utuh di dalam binary lewat pencarian UTF-16 mentah, dan
+  installer-nya sendiri (dibuat dari mekanisme BERBEDA, `VIAddVersionKey`
+  langsung di `project.nsi`) menampilkan metadata dengan benar lewat
+  pembacaan yang sama. Kemungkinan besar kuirk upstream Wails --
+  `build/windows/info.json` scaffold default memakai kunci bahasa
+  `"0000"` (neutral, tanpa codepage eksplisit) yang tampaknya tidak
+  dikenali pembaca .NET, BUKAN sesuatu yang diperkenalkan di increment
+  ini (file itu tidak diubah sama sekali). Belum dicoba diperbaiki --
+  dampaknya kosmetik (tab Properti file di luar installer), bukan
+  fungsional.
