@@ -1,0 +1,97 @@
+:root {
+    color-scheme: dark;
+    --bg: #1b2636;
+    --bg-pane: #141c29;
+    --border: #2c3a4f;
+    --text: #e4e9f2;
+    --text-dim: #8a97ac;
+    --accent: #4f8cff;
+    --error: #ff6b6b;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+#toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--bg-pane);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+#app-title {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+#status {
+    font-size: 0.85em;
+    color: var(--text-dim);
+}
+
+#panes {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+}
+
+#editor-pane {
+    flex: 1 1 50%;
+    min-width: 0;
+    overflow: auto;
+    border-right: 1px solid var(--border);
+}
+
+#editor-pane .cm-editor {
+    height: 100%;
+    font-size: 14px;
+}
+
+#editor-pane .cm-scroller {
+    font-family: "Cascadia Code", "Consolas", monospace;
+}
+
+#preview-pane {
+    flex: 1 1 50%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+#pdf-frame {
+    flex: 1;
+    border: none;
+    background: #fff;
+}
+
+#log-pane {
+    flex-shrink: 0;
+    max-height: 35%;
+    margin: 0;
+    padding: 10px 14px;
+    overflow: auto;
+    background: #24101099;
+    color: var(--error);
+    border-top: 1px solid var(--border);
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+}
