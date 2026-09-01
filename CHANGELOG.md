@@ -8,6 +8,38 @@ Semua perubahan penting pada proyek ini dicatat di sini. Format mengikuti
 
 ### Added
 
+- **Save/open file**: `app.go` menambah `OpenDocument` (dialog native,
+  baca `.tex` terpilih ke memori), `SaveDocument` (tulis langsung ke path
+  yang sudah diketahui, TANPA dialog), dan `SaveDocumentAs` (SELALU
+  tampilkan dialog lokasi simpan) -- ketiganya dibind ke frontend lewat
+  Wails, dilindungi `fileMu` (`sync.Mutex` BARU, terpisah dari `mu` yang
+  dipakai `Compile`/`EnsureEngine` -- operasi file berdasar dialog tidak
+  menyentuh `engineBin`/`workDir`, jadi membuka/menyimpan file tidak perlu
+  menunggu kompilasi yang sedang berjalan sampai beberapa menit, lihat
+  bagian Security untuk kenapa `fileMu` sendiri perlu ada).
+  - Toolbar baru (Baru/Buka/Simpan/Simpan sebagai) di `frontend/index.html`
+    + keyboard shortcut standar (Ctrl+O, Ctrl+S, Ctrl+Shift+S) di
+    `frontend/src/main.js`.
+  - Indikator "belum disimpan" (`•` di judul dokumen, `updateTitle`) --
+    ditandai begitu editor berubah SETELAH dibuka/disimpan terakhir kali,
+    dihapus lagi setelah simpan berikutnya sukses (lihat `docGeneration`
+    di bagian Security untuk penanganan race saat operator mengetik
+    SELAGI penyimpanan berlangsung). `suppressDirty` mencegah penggantian
+    isi PROGRAMATIK (Buka/Baru mengganti seluruh isi editor lewat
+    `view.dispatch`) sendiri keliru terhitung sebagai "perubahan operator"
+    oleh `EditorView.updateListener`.
+  - Konfirmasi `confirm()` native muncul kalau operator membuka file
+    lain/membuat dokumen baru (`handleOpen`/`handleNew`) selagi ada
+    perubahan belum disimpan -- SENGAJA belum ada perlindungan yang sama
+    untuk MENUTUP APLIKASI (butuh `OnBeforeClose` di Go plus round-trip
+    query status dirty ke frontend, dinilai layak jadi increment
+    terpisah, lihat ROADMAP.md).
+  - `app_test.go` (baru): unit test `SaveDocument` dan `atomicWriteFile`
+    (lihat bagian Security) -- path kosong ditolak sebelum menyentuh
+    disk, tulis berhasil, menimpa (bukan menambah/menggabung) file yang
+    sudah ada, tidak ada file sementara tertinggal setelah sukses, gagal
+    jelas kalau direktori tujuan tidak ada.
+
 - Increment pertama latex-studio: editor LaTeX standalone (GUI Wails v2 --
   Go + WebView2, bukan Electron) dengan auto-recompile ke PDF.
   - `internal/tectonic`: bootstrap engine [Tectonic](https://tectonic-typesetting.github.io/)
@@ -50,6 +82,71 @@ Semua perubahan penting pada proyek ini dicatat di sini. Format mengikuti
 
 ### Security
 
+- **Ditemukan dan diperbaiki lewat code review sebelum commit pertama
+  fitur save/open** -- dua temuan correctness plus satu kegagalan
+  verifikasi build, semuanya pada draf awal `app.go`/`frontend/src/main.js`
+  save/open, sebelum kode ini pernah di-commit:
+  - **High -- perubahan baru bisa keliru dianggap sudah tersimpan**: draf
+    awal `handleSave`/`handleSaveAs` (`frontend/src/main.js`) mengambil
+    isi editor SEBELUM `await SaveDocument(...)`/`await
+    SaveDocumentAs(...)`, lalu SELALU menjalankan `dirty = false` tanpa
+    syarat setelah operasi selesai -- kalau operator mengetik LAGI selagi
+    penyimpanan masih berlangsung (mis. file di network drive yang
+    lambat), file di disk berisi snapshot LAMA, tapi indikator `•` di
+    judul sudah hilang duluan, membuat operator mengira ketikan terbaru
+    sudah aman padahal belum pernah tersimpan sama sekali. Diperbaiki
+    lewat `docGeneration`, counter yang naik tiap ada perubahan operator
+    sungguhan (`docChanged && !suppressDirty`) -- `handleSave`/
+    `handleSaveAs` menyimpan nilainya SEBELUM `await`, dan cuma
+    menjalankan `dirty = false` kalau `docGeneration` masih PERSIS sama
+    setelah `await` selesai (berarti tidak ada ketikan baru di sela-sela
+    penyimpanan).
+  - **High -- operasi file paralel bisa selesai dengan urutan terbalik**:
+    draf awal `OpenDocument`/`SaveDocument`/`SaveDocumentAs` tidak
+    dilindungi mutex apa pun di backend, dan frontend juga tidak punya
+    guard yang mencegah dua operasi file dipicu berdekatan (mis. klik
+    tombol lalu buru-buru Ctrl+S) -- bisa menjalankan dua penyimpanan ke
+    path yang sama, membuka beberapa dialog sekaligus, atau (paling
+    berbahaya) membuat `currentPath`/status dirty di frontend ditentukan
+    oleh Promise mana yang SELESAI paling akhir, bukan yang DIMULAI
+    paling akhir (operasi lambat yang dipicu duluan bisa menimpa state
+    dari operasi cepat yang dipicu belakangan). Diperbaiki DUA lapis,
+    keduanya perlu (melindungi hal berbeda): `fileMu` (`sync.Mutex` baru
+    di `App`, TERPISAH dari `mu` yang dipakai `Compile`/`EnsureEngine`,
+    lihat komentar field-nya) menyerialkan urutan tulis-disk di backend;
+    `fileOperationInProgress` plus `withFileOperation`
+    (`frontend/src/main.js`) mencegah operasi file KEDUA dipicu sama
+    sekali selagi satu masih berjalan di frontend (tombol toolbar juga
+    dinonaktifkan sementara sebagai umpan balik visual) -- ini yang
+    benar-benar mencegah masalah urutan Promise di atas, `fileMu`
+    sendirian cuma menjamin tulis-disk tidak saling interleave tanpa
+    menjamin urutan state frontend.
+  - **Build lulus tapi `git diff --check` gagal**: binding TypeScript
+    hasil `wails generate module`/`wails build`
+    (`frontend/wailsjs/go/models.ts`, kadang juga `App.js`/`App.d.ts`)
+    konsisten meninggalkan trailing whitespace (tab) di baris kosong
+    template-nya -- klaim "diff check bersih" pada laporan sebelumnya
+    TIDAK BENAR, belum pernah benar-benar dijalankan/diverifikasi.
+    Dibersihkan manual (`sed 's/[ \t]*$//'`) dan DIKONFIRMASI MUNCUL LAGI
+    di build berikutnya (bukan kejadian sekali doang) -- didokumentasikan
+    di README.md sebagai langkah wajib sebelum commit tiap kali
+    `frontend/wailsjs/` berubah, bukan diasumsikan sudah beres selamanya.
+  - Catatan tambahan yang JUGA diperbaiki (ditandai non-blocking oleh
+    reviewer, tapi murah dan langsung memperkuat jaminan "tidak
+    kehilangan dokumen" yang jadi inti fitur ini): `SaveDocument`/
+    `SaveDocumentAs` sekarang menulis lewat `atomicWriteFile` (file
+    sementara di direktori yang sama -> `os.Rename`, pola yang sama
+    dengan instalasi binary Tectonic) alih-alih `os.WriteFile` langsung
+    ke path tujuan -- kegagalan di tengah penulisan (disk penuh, proses
+    dibunuh paksa, koneksi network drive putus) tidak lagi bisa merusak
+    dokumen yang sedang diedit, isi LAMA tetap utuh sampai penulisan BARU
+    benar-benar selesai. `OpenDocument` sekarang menolak file lebih besar
+    dari 50 MiB (`maxOpenFileBytes`) dan file yang isinya BUKAN UTF-8
+    valid -- yang kedua bukan kosmetik: byte tidak valid UTF-8 yang
+    diteruskan apa adanya akan diam-diam diganti `encoding/json` dengan
+    U+FFFD saat dikirim ke frontend, dan kalau operator menyimpannya
+    kembali tanpa sadar, file ASLI berenkoding lain (mis. Latin-1) akan
+    tertimpa versi yang sudah rusak.
 - **Ditemukan dan diperbaiki lewat code review sebelum commit pertama** --
   tiga temuan pada draf awal `internal/tectonic` dan `app.go`, sebelum
   kode ini pernah di-commit sama sekali:
@@ -179,3 +276,30 @@ Semua perubahan penting pada proyek ini dicatat di sini. Format mengikuti
     compile-otomatis-saat-startup terbukti masih bekerja identik dengan
     sebelum perbaikan -- perubahan keamanan/robustness ini TIDAK
     meregresi jalur yang sudah terverifikasi sebelumnya.
+  - **Setelah menambah save/open file**: `wails build` diulang lagi,
+    binding `OpenDocument`/`SaveDocument`/`SaveDocumentAs` dikonfirmasi
+    ter-generate benar di `frontend/wailsjs/go/main/App.js` lewat `wails
+    generate module`. Screenshot aplikasi sungguhan menunjukkan toolbar
+    baru (Baru/Buka/Simpan/Simpan sebagai) tampil benar dengan judul
+    "Dokumen baru".
+  - Percobaan memverifikasi KLIK tombol Buka/Simpan lewat koordinat mouse
+    terprogram (`mouse_event`+`SetCursorPos`) TIDAK berhasil dua kali
+    berturut-turut -- percobaan pertama tanpa kesadaran DPI menghasilkan
+    koordinat yang salah total (rasio ukuran window vs koordinat klik
+    tidak masuk akal); diperbaiki dengan
+    `SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)`
+    di skrip PowerShell (mengonfirmasi Windows scaling 125% adalah
+    penyebabnya -- client rect sebelum/sesudah fix beda rasio ~1.25x
+    persis), tapi percobaan KEDUA (koordinat proporsional dari
+    screenshot sebelumnya) tetap salah sasaran -- klik yang dimaksudkan
+    ke tombol "Buka" malah jatuh di area editor. Dihentikan di titik ini
+    (bukan dikejar sampai berhasil) -- risiko dinilai rendah karena
+    kode-nya straightforward (event listener standar -> method
+    Wails-bound -> `wailsruntime.OpenFileDialog`/`SaveFileDialog`, API
+    Wails yang umum dipakai, bukan logic custom yang rawan bug), dicatat
+    jujur sebagai belum diverifikasi lewat klik sungguhan di ROADMAP.md,
+    sama seperti keterbatasan `SendKeys` untuk ketikan sebelumnya.
+    Verifikasi mendatang untuk KEDUANYA (ketikan dan klik) butuh driver
+    berbasis WebView2 DevTools Protocol yang berinteraksi lewat DOM
+    (`element.click()`, `dispatchEvent`), bukan input Win32 sintetis di
+    level OS.

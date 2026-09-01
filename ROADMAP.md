@@ -59,12 +59,69 @@
       verifikasi apa pun. Detail lengkap tiap temuan dan fix-nya di
       CHANGELOG.md bagian Security.
 
+## Save/open file
+
+- [x] `app.go`: `OpenDocument` (dialog native, baca `.tex` terpilih),
+      `SaveDocument` (tulis langsung ke path yang sudah diketahui, TANPA
+      dialog), `SaveDocumentAs` (SELALU tampilkan dialog lokasi) dibind ke
+      frontend -- ketiganya dilindungi `fileMu` (`sync.Mutex` TERPISAH
+      dari `mu` yang dipakai `Compile`/`EnsureEngine`, lihat komentar
+      field-nya di `app.go`): operasi file berdasar dialog tidak
+      menyentuh `engineBin`/`workDir`, jadi membuka/menyimpan file tidak
+      perlu menunggu kompilasi yang mungkin sedang berjalan sampai
+      beberapa menit, TAPI tetap perlu diserialkan terhadap SESAMA
+      operasi file (ditemukan lewat code review, lihat CHANGELOG.md
+      bagian Security). `SaveDocument`/`SaveDocumentAs` menulis lewat
+      `atomicWriteFile` (temp sibling + `os.Rename`), `OpenDocument`
+      menolak file >50 MiB atau yang bukan UTF-8 valid.
+- [x] Toolbar (Baru/Buka/Simpan/Simpan sebagai) + keyboard shortcut
+      (Ctrl+O, Ctrl+S, Ctrl+Shift+S) di `frontend/src/main.js`. Indikator
+      "belum disimpan" (titik di judul dokumen) muncul begitu editor
+      berubah SETELAH dibuka/disimpan, hilang lagi setelah simpan
+      berikutnya sukses SELAMA tidak ada ketikan baru selagi penyimpanan
+      berlangsung (`docGeneration`, lihat CHANGELOG.md bagian Security).
+      `suppressDirty` mencegah penggantian isi programatik (Buka/Baru)
+      sendiri keliru dihitung sebagai perubahan operator.
+      `fileOperationInProgress`/`withFileOperation` mencegah Buka/Simpan/
+      Simpan sebagai/Baru tumpang tindih (tombol toolbar dinonaktifkan
+      sementara selagi satu operasi berjalan). Konfirmasi `confirm()`
+      native muncul kalau operator membuka file lain/membuat dokumen baru
+      selagi ada perubahan belum disimpan.
+- [x] **Diverifikasi**: build Go (`go build`, `go vet`, `gofmt`) dan
+      binding JS (`wails generate module`) sukses, `wails build` production
+      berhasil (diulang lagi setelah perbaikan Security, tidak regresi --
+      screenshot ulang menunjukkan toolbar dan compile-otomatis-saat-startup
+      masih identik), `go test ./...` lulus termasuk `app_test.go` baru
+      (`TestSaveDocument`, `TestAtomicWriteFile`). `git diff --check`
+      SEKARANG BENAR-BENAR bersih (exit 0) -- klaim "bersih" pada laporan
+      sebelum perbaikan Security TIDAK AKURAT, lihat CHANGELOG.md.
+- [ ] **Belum diverifikasi lewat interaksi sungguhan**: klik tombol
+      Buka/Simpan (memicu dialog file native) dan alur simpan/buka
+      end-to-end. Percobaan mengklik lewat koordinat mouse sintetis
+      (`mouse_event` + `SetCursorPos`, sudah dikoreksi untuk DPI scaling
+      lewat `SetProcessDpiAwarenessContext`) TIDAK presisi -- klik yang
+      dimaksudkan ke tombol "Buka" malah jatuh di area editor,
+      kemungkinan karena WebView2/Chromium me-render tata letak dengan
+      cara yang tidak 1:1 dengan asumsi koordinat proporsional dari
+      screenshot sebelumnya. Sama seperti keterbatasan `SendKeys` yang
+      sudah dicatat sebelumnya -- kode-nya sendiri straightforward
+      (event listener standar memanggil method Wails-bound yang
+      membungkus `wailsruntime.OpenFileDialog`/`SaveFileDialog`, API
+      Wails yang umum dipakai), tapi belum dibuktikan lewat klik
+      sungguhan. Verifikasi mendatang butuh driver WebView2 DevTools
+      Protocol yang bisa klik lewat DOM (`element.click()`) alih-alih
+      koordinat layar, sama seperti catatan verifikasi ketikan di atas.
+- [ ] Belum ada peringatan/pencegahan menutup APLIKASI (bukan cuma ganti
+      dokumen) selagi ada perubahan belum disimpan -- indikator dirty di
+      judul adalah satu-satunya sinyal saat ini. Butuh `OnBeforeClose`
+      (`options.App`, Go) yang menanyakan status dirty ke frontend
+      sebelum window benar-benar tertutup -- di luar cakupan increment
+      ini, SENGAJA tidak ditambah sekarang supaya tidak menambah
+      kompleksitas round-trip Go<->JS yang belum teruji cuma untuk fitur
+      pelengkap (dibanding kemampuan inti simpan/buka yang sudah ada).
+
 ## Belum dikerjakan (di luar cakupan MVP ini)
 
-- [ ] **Save/open file** -- dialog native (`wailsruntime.OpenFileDialog`/
-      `SaveFileDialog`) untuk menyimpan dan membuka `.tex` dari disk.
-      Tanpa ini dokumen cuma hidup di memori editor selama aplikasi
-      berjalan (lihat README.md bagian Batasan).
 - [ ] **Multi-file project**: `\input`/`\include`, gambar/asset relatif,
       bibliografi (`.bib`) -- `internal/tectonic.Compile` sudah menerima
       `workDir` per sesi yang bisa jadi basis untuk ini, tapi UI-nya
@@ -86,8 +143,14 @@
       (`httptest.Server`, pola yang sama dipakai `internal/ollama` pada
       local-agent-playground) untuk menguji `downloadToTemp`/`Ensure`
       tanpa GitHub sungguhan, dan Tectonic asli tetap dibutuhkan untuk
-      menguji `Compile`. `app.go` (termasuk mutex serialisasi
-      `EnsureEngine`/`Compile`) juga belum ada test sama sekali.
+      menguji `Compile`. `app_test.go` sudah menutup `SaveDocument`
+      (satu-satunya method file I/O yang TIDAK menampilkan dialog, jadi
+      bisa dites hermetik: path kosong ditolak, tulis, timpa file yang
+      sudah ada). `EnsureEngine`/`Compile` (butuh Tectonic sungguhan) dan
+      `OpenDocument`/`SaveDocumentAs` (butuh window OS sungguhan untuk
+      dialog native `wailsruntime.OpenFileDialog`/`SaveFileDialog`, tidak
+      bisa dipanggil dari `go test` biasa) masih belum ada test sama
+      sekali.
 - [ ] Packaging installer (NSIS, sudah terdeteksi opsional oleh
       `wails doctor` tapi belum dikonfigurasi) untuk distribusi di luar
       `wails build` mentah.

@@ -9,3 +9,15 @@ export function Compile(arg1) {
 export function EnsureEngine() {
   return window['go']['main']['App']['EnsureEngine']();
 }
+
+export function OpenDocument() {
+  return window['go']['main']['App']['OpenDocument']();
+}
+
+export function SaveDocument(arg1, arg2) {
+  return window['go']['main']['App']['SaveDocument'](arg1, arg2);
+}
+
+export function SaveDocumentAs(arg1) {
+  return window['go']['main']['App']['SaveDocumentAs'](arg1);
+}

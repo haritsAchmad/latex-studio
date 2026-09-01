@@ -30,10 +30,11 @@ dijalankan.
 
 ```text
 main.go                       entry point Wails, wiring OnStartup/OnShutdown/Bind
-app.go                        struct App -- method public-nya dibind ke frontend (EnsureEngine, Compile)
+app.go                        struct App -- method public-nya dibind ke frontend (EnsureEngine, Compile, OpenDocument, SaveDocument, SaveDocumentAs)
+app_test.go                   unit test untuk SaveDocument (satu-satunya method file I/O tanpa dialog, lihat ROADMAP.md)
 internal/tectonic/            bootstrap (unduh+ekstrak) dan eksekusi Tectonic
-frontend/src/main.js           editor CodeMirror, debounce compile, render PDF
-frontend/src/style.css         layout split-pane
+frontend/src/main.js           editor CodeMirror, debounce compile, render PDF, toolbar Buka/Simpan/Simpan sebagai
+frontend/src/style.css         layout split-pane + toolbar
 frontend/wailsjs/               binding JS yang di-generate otomatis dari app.go (JANGAN edit manual)
 ```
 
@@ -76,16 +77,39 @@ wails dev      # mode development, hot reload frontend
 wails build    # build production -> build/bin/latex-studio.exe
 ```
 
+**Sebelum commit setelah `wails build`/`wails generate module`**: generator
+TypeScript Wails (`frontend/wailsjs/go/models.ts`, kadang juga
+`App.js`/`App.d.ts`) konsisten meninggalkan trailing whitespace (tab) di
+baris-baris tertentu -- ditemukan lewat `git diff --check` yang gagal
+sebelum commit pertama fitur save/open, dan MUNCUL LAGI di build
+berikutnya (bukan kejadian sekali doang, sudah dikonfirmasi). Jalankan ini
+sebelum commit kalau ada perubahan di `frontend/wailsjs/`:
+
+```bash
+sed -i 's/[ \t]*$//' frontend/wailsjs/go/models.ts frontend/wailsjs/go/main/App.js frontend/wailsjs/go/main/App.d.ts frontend/wailsjs/runtime/runtime.js frontend/wailsjs/runtime/runtime.d.ts
+git diff --check   # harus tidak menghasilkan output apa pun (exit 0)
+```
+
+## Save/open file
+
+Toolbar (Baru/Buka/Simpan/Simpan sebagai) dan keyboard shortcut standar
+(Ctrl+O, Ctrl+S, Ctrl+Shift+S) lewat dialog file native
+(`wailsruntime.OpenFileDialog`/`SaveFileDialog`). Judul dokumen di toolbar
+menampilkan nama file dan titik (`•`) kalau ada perubahan belum disimpan.
+Menutup aplikasi TIDAK PERNAH mencegah/mengingatkan soal perubahan belum
+disimpan pada increment ini -- lihat ROADMAP.md.
+
 ## Batasan pada increment ini (lihat ROADMAP.md untuk detail)
 
-- **Belum ada save/open file** -- dokumen cuma ada di memori editor
-  selama aplikasi berjalan, ditulis ulang ke direktori kerja sementara
-  (dihapus saat aplikasi ditutup) setiap kali dikompilasi. Menutup
-  aplikasi tanpa menyalin isi editor keluar berarti dokumen hilang.
 - **Satu dokumen, satu file** -- tidak ada multi-tab, tidak ada `\input`/
   `\include` lintas file, tidak ada dukungan asset (gambar, bibliografi).
-- Format PDF/JSON compile diverifikasi manual (screenshot aplikasi
-  sungguhan, lihat CHANGELOG.md) -- `internal/tectonic` sudah punya unit
-  test untuk logic murni (checksum, URL, verifikasi hash), tapi jalur
-  yang benar-benar bicara ke Tectonic/jaringan (`Ensure`/`Compile`) dan
-  `app.go` masih belum ada automated test sama sekali, lihat ROADMAP.md.
+- **Tidak ada peringatan menutup aplikasi dengan perubahan belum
+  disimpan** -- indikator titik di judul adalah satu-satunya sinyal.
+- Format PDF/JSON compile dan toolbar save/open diverifikasi lewat build
+  + screenshot aplikasi sungguhan, TAPI klik tombol Buka/Simpan lewat
+  interaksi terprogram (koordinat mouse) belum berhasil diverifikasi --
+  lihat CHANGELOG.md/ROADMAP.md untuk detail keterbatasan otomasi GUI ini.
+  `internal/tectonic` dan `SaveDocument` (`app_test.go`) sudah punya unit
+  test untuk logic yang bisa dites tanpa window OS/Tectonic sungguhan;
+  `Ensure`/`Compile`/`OpenDocument`/`SaveDocumentAs` masih belum ada
+  automated test sama sekali, lihat ROADMAP.md.
