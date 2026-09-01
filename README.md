@@ -30,8 +30,8 @@ dijalankan.
 
 ```text
 main.go                       entry point Wails, wiring OnStartup/OnShutdown/Bind
-app.go                        struct App -- method public-nya dibind ke frontend (EnsureEngine, Compile, OpenDocument, SaveDocument, SaveDocumentAs)
-app_test.go                   unit test untuk SaveDocument (satu-satunya method file I/O tanpa dialog, lihat ROADMAP.md)
+app.go                        struct App -- method public-nya dibind ke frontend (EnsureEngine, Compile, OpenDocument, SaveDocument, SaveDocumentAs, ExportPDF)
+app_test.go                   unit test untuk SaveDocument, atomicWriteFile, dan bagian ExportPDF tanpa dialog (lihat ROADMAP.md)
 internal/tectonic/            bootstrap (unduh+ekstrak) dan eksekusi Tectonic
 frontend/src/main.js           editor CodeMirror, debounce compile, render PDF, toolbar Buka/Simpan/Simpan sebagai
 frontend/src/style.css         layout split-pane + toolbar
@@ -99,17 +99,26 @@ menampilkan nama file dan titik (`•`) kalau ada perubahan belum disimpan.
 Menutup aplikasi TIDAK PERNAH mencegah/mengingatkan soal perubahan belum
 disimpan pada increment ini -- lihat ROADMAP.md.
 
+## Export PDF
+
+Tombol "Ekspor PDF" di toolbar menyimpan PDF hasil compile TERAKHIR yang
+sukses (bukan baca ulang dari disk -- selalu persis PDF yang sedang
+tampil di preview pane) ke lokasi pilihan operator. Nonaktif sampai ada
+compile yang sukses sama sekali.
+
 ## Batasan pada increment ini (lihat ROADMAP.md untuk detail)
 
 - **Satu dokumen, satu file** -- tidak ada multi-tab, tidak ada `\input`/
   `\include` lintas file, tidak ada dukungan asset (gambar, bibliografi).
 - **Tidak ada peringatan menutup aplikasi dengan perubahan belum
   disimpan** -- indikator titik di judul adalah satu-satunya sinyal.
-- Format PDF/JSON compile dan toolbar save/open diverifikasi lewat build
-  + screenshot aplikasi sungguhan, TAPI klik tombol Buka/Simpan lewat
-  interaksi terprogram (koordinat mouse) belum berhasil diverifikasi --
-  lihat CHANGELOG.md/ROADMAP.md untuk detail keterbatasan otomasi GUI ini.
-  `internal/tectonic` dan `SaveDocument` (`app_test.go`) sudah punya unit
-  test untuk logic yang bisa dites tanpa window OS/Tectonic sungguhan;
-  `Ensure`/`Compile`/`OpenDocument`/`SaveDocumentAs` masih belum ada
+- Format PDF/JSON compile dan toolbar save/open/ekspor diverifikasi lewat
+  build + screenshot aplikasi sungguhan, TAPI klik tombol Buka/Simpan/
+  Ekspor PDF lewat interaksi terprogram (koordinat mouse) belum berhasil
+  diverifikasi -- lihat CHANGELOG.md/ROADMAP.md untuk detail keterbatasan
+  otomasi GUI ini. `internal/tectonic` dan bagian `app.go` yang tidak
+  butuh dialog (`SaveDocument`, `atomicWriteFile`, penolakan awal
+  `ExportPDF`, lihat `app_test.go`) sudah punya unit test;
+  `Ensure`/`Compile`/`OpenDocument`/`SaveDocumentAs`/`ExportPDF` (bagian
+  yang menampilkan dialog) masih belum ada
   automated test sama sekali, lihat ROADMAP.md.

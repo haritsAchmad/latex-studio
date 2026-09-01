@@ -2,7 +2,7 @@ import './style.css'
 import {EditorView, basicSetup} from 'codemirror'
 import {StreamLanguage} from '@codemirror/language'
 import {stex} from '@codemirror/legacy-modes/mode/stex'
-import {Compile, EnsureEngine, OpenDocument, SaveDocument, SaveDocumentAs} from '../wailsjs/go/main/App'
+import {Compile, EnsureEngine, ExportPDF, OpenDocument, SaveDocument, SaveDocumentAs} from '../wailsjs/go/main/App'
 import {EventsOn} from '../wailsjs/runtime/runtime'
 
 const DEBOUNCE_MS = 900
@@ -28,6 +28,12 @@ const pdfFrame = document.getElementById('pdf-frame')
 const logPane = document.getElementById('log-pane')
 
 let currentPdfUrl = null
+// lastPdfBase64 adalah PDF (base64, apa adanya dari Result.pdf) hasil
+// compile TERAKHIR yang SUKSES -- dikirim balik ke ExportPDF tanpa
+// decode/encode ulang di frontend (lihat komentar ExportPDF di app.go
+// untuk kenapa itu aman). null berarti belum pernah ada compile yang
+// sukses sama sekali, tombol Ekspor PDF dinonaktifkan selama itu.
+let lastPdfBase64 = null
 let debounceTimer = null
 let compiling = false
 // pendingAfterCurrent SENGAJA cuma boolean, bukan antrean isi -- kalau ada
@@ -139,6 +145,8 @@ async function runCompile(view) {
                 URL.revokeObjectURL(currentPdfUrl)
             }
             currentPdfUrl = url
+            lastPdfBase64 = result.pdf
+            refreshFileButtonsDisabled()
             showLog('')
             setStatus('sukses')
         } else {
@@ -219,30 +227,45 @@ function confirmDiscardIfDirty(message) {
     return confirm(message)
 }
 
+const exportPdfBtn = document.getElementById('btn-export-pdf')
 const fileButtons = [
     document.getElementById('btn-new'),
     document.getElementById('btn-open'),
     document.getElementById('btn-save'),
     document.getElementById('btn-save-as'),
+    exportPdfBtn,
 ]
 
-// withFileOperation menyerialkan Buka/Simpan/Simpan sebagai/Baru DI SISI
-// FRONTEND -- lihat komentar fileOperationInProgress. Tombol toolbar
-// dinonaktifkan sementara juga supaya operator dapat umpan balik visual
-// (bukan cuma klik/shortcut yang diam-diam diabaikan) selagi satu operasi
-// file sedang berlangsung.
+// refreshFileButtonsDisabled menyalakan/mematikan tombol toolbar sesuai
+// DUA syarat independen: fileOperationInProgress (semua tombol, lihat
+// withFileOperation) DAN, khusus tombol Ekspor PDF, ada tidaknya
+// lastPdfBase64 -- tombol itu HARUS tetap nonaktif setelah operasi file
+// lain selesai kalau belum pernah ada compile yang sukses, bukan
+// diam-diam ikut dinyalakan oleh withFileOperation yang cuma tahu soal
+// "operasi file sedang berjalan atau tidak", tidak tahu soal PDF.
+function refreshFileButtonsDisabled() {
+    fileButtons.forEach((b) => {
+        b.disabled = fileOperationInProgress || (b === exportPdfBtn && !lastPdfBase64)
+    })
+}
+
+// withFileOperation menyerialkan Buka/Simpan/Simpan sebagai/Baru/Ekspor
+// PDF DI SISI FRONTEND -- lihat komentar fileOperationInProgress. Tombol
+// toolbar dinonaktifkan sementara juga supaya operator dapat umpan balik
+// visual (bukan cuma klik/shortcut yang diam-diam diabaikan) selagi satu
+// operasi file sedang berlangsung.
 async function withFileOperation(fn) {
     if (fileOperationInProgress) {
         setStatus('operasi file lain sedang berjalan, tunggu sebentar...')
         return
     }
     fileOperationInProgress = true
-    fileButtons.forEach((b) => (b.disabled = true))
+    refreshFileButtonsDisabled()
     try {
         await fn()
     } finally {
         fileOperationInProgress = false
-        fileButtons.forEach((b) => (b.disabled = false))
+        refreshFileButtonsDisabled()
     }
 }
 
@@ -321,10 +344,29 @@ async function handleNew() {
     })
 }
 
+async function handleExportPdf() {
+    if (!lastPdfBase64) {
+        return
+    }
+    await withFileOperation(async () => {
+        try {
+            const result = await ExportPDF(lastPdfBase64)
+            if (result.cancelled) {
+                return
+            }
+            setStatus('PDF diekspor ke ' + result.path)
+        } catch (err) {
+            showLog(String(err))
+            setStatus('gagal mengekspor PDF')
+        }
+    })
+}
+
 document.getElementById('btn-new').addEventListener('click', handleNew)
 document.getElementById('btn-open').addEventListener('click', handleOpen)
 document.getElementById('btn-save').addEventListener('click', handleSave)
 document.getElementById('btn-save-as').addEventListener('click', handleSaveAs)
+exportPdfBtn.addEventListener('click', handleExportPdf)
 
 window.addEventListener('keydown', (e) => {
     const mod = e.ctrlKey || e.metaKey
@@ -349,6 +391,7 @@ EventsOn('engine:progress', (stage) => {
 })
 
 updateTitle()
+refreshFileButtonsDisabled()
 setStatus('menyiapkan engine Tectonic (unduhan pertama bisa beberapa menit)...')
 EnsureEngine()
     .then(() => runCompile(view))

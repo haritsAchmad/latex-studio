@@ -10,6 +10,10 @@ export function EnsureEngine() {
   return window['go']['main']['App']['EnsureEngine']();
 }
 
+export function ExportPDF(arg1) {
+  return window['go']['main']['App']['ExportPDF'](arg1);
+}
+
 export function OpenDocument() {
   return window['go']['main']['App']['OpenDocument']();
 }

@@ -23,7 +23,7 @@ export namespace main {
 	    static createFrom(source: any = {}) {
 	        return new SaveResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -43,7 +43,7 @@ export namespace tectonic {
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.pdf = source["pdf"];

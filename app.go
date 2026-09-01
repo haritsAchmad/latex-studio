@@ -343,3 +343,40 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	}
 	return nil
 }
+
+// ExportPDF menampilkan dialog lokasi simpan dan menulis pdf (isi PDF
+// hasil compile TERAKHIR yang sukses, dikirim frontend apa adanya dari
+// Result.PDF milik Compile -- bukan dibaca ulang dari workDir, supaya
+// yang diekspor SELALU persis PDF yang sedang tampil di preview pane,
+// tanpa asumsi soal state file di disk) ke path pilihan operator. `pdf
+// []byte` di parameter Go otomatis di-decode Wails dari string base64
+// JS lewat konvensi encoding/json standar -- simetris dengan bagaimana
+// Result.PDF (juga []byte) di-encode jadi base64 saat dikirim KE
+// frontend, jadi frontend cukup meneruskan string yang sama tanpa decode
+// manual di sisi mana pun. Dilindungi fileMu yang sama dengan
+// OpenDocument/SaveDocument/SaveDocumentAs.
+func (a *App) ExportPDF(pdf []byte) (SaveResult, error) {
+	a.fileMu.Lock()
+	defer a.fileMu.Unlock()
+
+	if len(pdf) == 0 {
+		return SaveResult{}, errors.New("belum ada PDF untuk diekspor -- compile dokumen dulu sampai sukses")
+	}
+	path, err := wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
+		Title:           "Ekspor PDF",
+		DefaultFilename: "dokumen.pdf",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "Dokumen PDF (*.pdf)", Pattern: "*.pdf"},
+		},
+	})
+	if err != nil {
+		return SaveResult{}, fmt.Errorf("dialog ekspor PDF: %w", err)
+	}
+	if path == "" {
+		return SaveResult{Cancelled: true}, nil
+	}
+	if err := atomicWriteFile(path, pdf, 0o644); err != nil {
+		return SaveResult{}, fmt.Errorf("tulis %s: %w", path, err)
+	}
+	return SaveResult{Path: path}, nil
+}

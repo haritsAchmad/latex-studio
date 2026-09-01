@@ -121,3 +121,20 @@ func TestAtomicWriteFile(t *testing.T) {
 		}
 	})
 }
+
+// TestExportPDF_EmptyRejectedBeforeDialog menguji satu-satunya bagian
+// ExportPDF yang bisa dites tanpa window OS sungguhan: penolakan PDF
+// kosong terjadi SEBELUM wailsruntime.SaveFileDialog dipanggil (yang
+// butuh a.ctx terisi) -- kalau urutannya kebalik, panggilan ini akan
+// panic (a.ctx nil pada &App{} kosong) alih-alih mengembalikan error yang
+// jelas.
+func TestExportPDF_EmptyRejectedBeforeDialog(t *testing.T) {
+	a := &App{}
+	_, err := a.ExportPDF(nil)
+	if err == nil {
+		t.Fatal("ExportPDF(nil) error = nil, ingin error")
+	}
+	if !strings.Contains(err.Error(), "compile") {
+		t.Errorf("ExportPDF() error = %q, ingin menyarankan compile dulu", err.Error())
+	}
+}

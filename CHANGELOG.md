@@ -8,6 +8,33 @@ Semua perubahan penting pada proyek ini dicatat di sini. Format mengikuti
 
 ### Added
 
+- **Export PDF**: `app.go` menambah `ExportPDF(pdf []byte)` -- dialog
+  native lokasi simpan, menulis lewat `atomicWriteFile` yang sama dengan
+  `SaveDocument`, dilindungi `fileMu` yang sama juga. Menerima PDF
+  LANGSUNG dari frontend (base64 apa adanya dari `Result.pdf` compile
+  terakhir yang sukses, `[]byte` di parameter Go otomatis di-decode Wails
+  dari string base64 JS lewat konvensi `encoding/json` standar) alih-alih
+  membaca ulang `workDir/main.pdf` dari disk -- yang diekspor SELALU
+  persis PDF yang sedang tampil di preview pane, tidak bergantung pada
+  asumsi soal state file sementara di disk.
+  - Tombol "Ekspor PDF" di toolbar (`frontend/index.html`), dinonaktifkan
+    (atribut `disabled` + `refreshFileButtonsDisabled` di
+    `frontend/src/main.js`) sampai ada compile yang sukses sama sekali
+    (`lastPdfBase64`) -- beda dari tombol Baru/Buka/Simpan/Simpan sebagai
+    yang cuma bergantung status `fileOperationInProgress`. Sama-sama ikut
+    `withFileOperation` supaya tidak tumpang tindih dengan operasi file
+    lain.
+  - `app_test.go`: `TestExportPDF_EmptyRejectedBeforeDialog` -- penolakan
+    PDF kosong dites hermetik (terjadi SEBELUM
+    `wailsruntime.SaveFileDialog` yang butuh window OS sungguhan dan
+    `a.ctx` terisi).
+  - Diverifikasi: build Go + binding JS + `wails build` production
+    sukses, screenshot aplikasi sungguhan menunjukkan tombol muncul di
+    toolbar dan tampak aktif setelah compile pertama sukses. Klik
+    tombolnya sendiri belum diverifikasi lewat interaksi sungguhan --
+    keterbatasan yang sama dengan tombol Buka/Simpan (lihat catatan
+    `SendKeys`/klik mouse terprogram di bawah).
+
 - **Save/open file**: `app.go` menambah `OpenDocument` (dialog native,
   baca `.tex` terpilih ke memori), `SaveDocument` (tulis langsung ke path
   yang sudah diketahui, TANPA dialog), dan `SaveDocumentAs` (SELALU

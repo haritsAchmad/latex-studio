@@ -120,6 +120,33 @@
       kompleksitas round-trip Go<->JS yang belum teruji cuma untuk fitur
       pelengkap (dibanding kemampuan inti simpan/buka yang sudah ada).
 
+## Export PDF
+
+- [x] `app.go`: `ExportPDF(pdf []byte)` -- dialog native lokasi simpan,
+      menulis lewat `atomicWriteFile` yang sama dengan `SaveDocument`,
+      dilindungi `fileMu` yang sama juga. Menerima PDF langsung dari
+      frontend (base64 apa adanya dari `Result.pdf` compile terakhir yang
+      sukses) alih-alih membaca ulang `workDir/main.pdf` dari disk --
+      jaminannya jadi "yang diekspor SELALU persis yang sedang tampil di
+      preview pane", bukan bergantung pada asumsi soal state file
+      sementara di disk.
+- [x] Tombol "Ekspor PDF" di toolbar, dinonaktifkan sampai ada compile
+      yang sukses (`lastPdfBase64`/`refreshFileButtonsDisabled` di
+      `frontend/src/main.js`) -- beda dari tombol Baru/Buka/Simpan/Simpan
+      sebagai yang cuma bergantung `fileOperationInProgress`, tombol ini
+      punya syarat tambahan supaya tidak bisa diklik sebelum ada apa pun
+      untuk diekspor. Sama-sama masuk `withFileOperation` (fileButtons)
+      supaya tidak tumpang tindih dengan operasi file lain.
+- [x] `app_test.go`: `TestExportPDF_EmptyRejectedBeforeDialog` --
+      penolakan PDF kosong dites hermetik (terjadi SEBELUM
+      `wailsruntime.SaveFileDialog` yang butuh window OS sungguhan).
+- [x] **Diverifikasi**: build Go + binding JS + `wails build` production
+      sukses, screenshot aplikasi sungguhan menunjukkan tombol "Ekspor
+      PDF" muncul di toolbar dan tampak aktif setelah compile pertama
+      sukses. Klik tombolnya sendiri (memicu dialog Save) BELUM
+      diverifikasi lewat interaksi sungguhan -- keterbatasan yang sama
+      dengan tombol Buka/Simpan (lihat bagian Save/open file di atas).
+
 ## Belum dikerjakan (di luar cakupan MVP ini)
 
 - [ ] **Multi-file project**: `\input`/`\include`, gambar/asset relatif,
@@ -131,9 +158,6 @@
       sudah punya flag `--synctex` yang belum dipakai.
 - [ ] Autocomplete/snippet perintah LaTeX di editor (CodeMirror mendukung
       lewat `autocompletion()`, belum diaktifkan).
-- [ ] Export/simpan PDF hasil compile ke lokasi pilihan operator (saat ini
-      PDF cuma ada di memori sebagai blob URL, hilang saat aplikasi
-      ditutup).
 - [ ] Automated test untuk `Ensure`/`Compile` yang benar-benar bicara ke
       Tectonic/jaringan -- `internal/tectonic/tectonic_test.go` sudah
       menutup logic murni (checksum, URL, verifikasi hash, lihat
@@ -143,14 +167,15 @@
       (`httptest.Server`, pola yang sama dipakai `internal/ollama` pada
       local-agent-playground) untuk menguji `downloadToTemp`/`Ensure`
       tanpa GitHub sungguhan, dan Tectonic asli tetap dibutuhkan untuk
-      menguji `Compile`. `app_test.go` sudah menutup `SaveDocument`
-      (satu-satunya method file I/O yang TIDAK menampilkan dialog, jadi
-      bisa dites hermetik: path kosong ditolak, tulis, timpa file yang
-      sudah ada). `EnsureEngine`/`Compile` (butuh Tectonic sungguhan) dan
-      `OpenDocument`/`SaveDocumentAs` (butuh window OS sungguhan untuk
-      dialog native `wailsruntime.OpenFileDialog`/`SaveFileDialog`, tidak
-      bisa dipanggil dari `go test` biasa) masih belum ada test sama
-      sekali.
+      menguji `Compile`. `app_test.go` sudah menutup `SaveDocument`,
+      `atomicWriteFile`, dan bagian `ExportPDF` yang tidak butuh dialog
+      (path/PDF kosong ditolak sebelum menyentuh disk/dialog, tulis,
+      timpa file yang sudah ada, tidak ada file sementara tertinggal).
+      `EnsureEngine`/`Compile` (butuh Tectonic sungguhan) dan
+      `OpenDocument`/`SaveDocumentAs`/`ExportPDF` (bagian yang BENAR-BENAR
+      menampilkan dialog, butuh window OS sungguhan untuk
+      `wailsruntime.OpenFileDialog`/`SaveFileDialog`, tidak bisa dipanggil
+      dari `go test` biasa) masih belum ada test sama sekali.
 - [ ] Packaging installer (NSIS, sudah terdeteksi opsional oleh
       `wails doctor` tapi belum dikonfigurasi) untuk distribusi di luar
       `wails build` mentah.

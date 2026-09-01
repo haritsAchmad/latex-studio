@@ -7,6 +7,8 @@ export function Compile(arg1:string):Promise<tectonic.Result>;
 
 export function EnsureEngine():Promise<void>;
 
+export function ExportPDF(arg1:Array<number>):Promise<main.SaveResult>;
+
 export function OpenDocument():Promise<main.OpenResult>;
 
 export function SaveDocument(arg1:string,arg2:string):Promise<void>;
