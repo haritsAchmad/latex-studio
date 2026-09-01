@@ -147,6 +147,39 @@
       diverifikasi lewat interaksi sungguhan -- keterbatasan yang sama
       dengan tombol Buka/Simpan (lihat bagian Save/open file di atas).
 
+## Autocomplete perintah LaTeX
+
+- [x] `frontend/src/main.js`: `latexCompletions` (CompletionSource
+      `@codemirror/autocomplete`) -- memicu popup saat kursor persis
+      setelah backslash diikuti nol atau lebih huruf (`context.matchBefore`),
+      menampilkan `LATEX_COMMANDS` (daftar statis perintah umum: struktur
+      dokumen, formatting teks, matematika dasar, referensi/bibliografi --
+      SENGAJA bukan daftar lengkap semua perintah/paket, lihat komentarnya
+      di kode). Didaftarkan lewat `stexLanguage.data.of({autocomplete:
+      latexCompletions})`, BUKAN memanggil `autocompletion()` kedua
+      kalinya -- `basicSetup` sudah memanggilnya sekali, facet config-nya
+      cuma mengambil pemanggilan PERTAMA, jadi `autocompletion({override:
+      [...]})` tambahan akan diam-diam DIABAIKAN; cara resmi menambah
+      completion source per-bahasa adalah lewat language data seperti ini.
+- [x] `@codemirror/autocomplete` ditambah eksplisit ke `package.json` --
+      sebelumnya cuma dependency transitif (dibawa masuk oleh package
+      `codemirror`), sekarang dependency langsung supaya jelas dipakai
+      sengaja, bukan kebetulan tersedia.
+- [x] **Diverifikasi sebagian**: `npx vite build` dan `wails build`
+      production sukses tanpa error, screenshot aplikasi sungguhan
+      menunjukkan editor tetap merender dan compile-otomatis-saat-startup
+      tidak regresi (kalau `stexLanguage.data.of` gagal di construction
+      time, `EditorView` akan gagal dibuat sama sekali dan pane editor
+      akan kosong -- screenshot yang benar jadi bukti tidak langsung
+      wiring-nya valid). Popup autocomplete SENDIRI (muncul saat mengetik
+      `\` lalu beberapa huruf) BELUM diverifikasi lewat interaksi
+      sungguhan -- keterbatasan yang sama persis dengan verifikasi
+      ketikan/klik yang sudah dicatat berulang kali di roadmap ini
+      (`SendKeys`/`mouse_event` tidak sampai ke elemen WebView2). Risiko
+      dinilai rendah: `context.matchBefore`/`data.of({autocomplete})`
+      adalah pola resmi dari dokumentasi `@codemirror/autocomplete`,
+      bukan logic custom yang rawan salah.
+
 ## Belum dikerjakan (di luar cakupan MVP ini)
 
 - [ ] **Multi-file project**: `\input`/`\include`, gambar/asset relatif,
@@ -156,8 +189,11 @@
 - [ ] **Multi-tab / multi-dokumen** dalam satu jendela aplikasi.
 - [ ] Sinkronisasi posisi kursor <-> halaman PDF (SyncTeX) -- Tectonic
       sudah punya flag `--synctex` yang belum dipakai.
-- [ ] Autocomplete/snippet perintah LaTeX di editor (CodeMirror mendukung
-      lewat `autocompletion()`, belum diaktifkan).
+- [ ] Snippet LaTeX yang lebih pintar (mis. `\begin{...}` otomatis
+      menyisipkan `\end{...}` pasangannya, placeholder yang bisa di-Tab
+      lewat isinya) -- autocomplete yang ada sekarang cuma menyisipkan
+      NAMA perintah polos (lihat bagian Autocomplete di atas), belum ada
+      snippet/template multi-bagian.
 - [ ] Automated test untuk `Ensure`/`Compile` yang benar-benar bicara ke
       Tectonic/jaringan -- `internal/tectonic/tectonic_test.go` sudah
       menutup logic murni (checksum, URL, verifikasi hash, lihat

@@ -8,6 +8,47 @@ Semua perubahan penting pada proyek ini dicatat di sini. Format mengikuti
 
 ### Added
 
+- **Autocomplete perintah LaTeX**: `frontend/src/main.js` menambah
+  `latexCompletions`, `CompletionSource` `@codemirror/autocomplete` yang
+  memicu popup saat kursor persis setelah backslash diikuti nol atau
+  lebih huruf (`context.matchBefore(/\\[a-zA-Z]*/)`), menampilkan
+  `LATEX_COMMANDS` -- daftar statis perintah umum (struktur dokumen,
+  formatting teks, matematika dasar, referensi/bibliografi), SENGAJA
+  bukan daftar lengkap semua perintah/paket LaTeX (autocomplete yang
+  sadar `\usepackage` di luar cakupan increment ini). Didaftarkan lewat
+  `stexLanguage.data.of({autocomplete: latexCompletions})` -- cara resmi
+  menambah completion source PER BAHASA di CodeMirror 6, BUKAN memanggil
+  `autocompletion()` kedua kalinya (facet config-nya cuma mengambil
+  pemanggilan PERTAMA yang sudah dilakukan `basicSetup`; pemanggilan
+  kedua dengan `override` akan diam-diam DIABAIKAN, bukan digabung/
+  menang). `@codemirror/autocomplete` ditambah eksplisit ke
+  `package.json` (sebelumnya cuma dependency transitif lewat package
+  `codemirror`).
+  - Diverifikasi SEBAGIAN: `npx vite build`/`wails build` production
+    sukses, screenshot aplikasi sungguhan menunjukkan editor tetap
+    merender dan compile-otomatis-saat-startup tidak regresi (bukti
+    tidak langsung construction-time wiring valid -- kalau
+    `stexLanguage.data.of` gagal saat itu, `EditorView` gagal dibuat
+    sama sekali). Popup autocomplete SENDIRI belum diverifikasi lewat
+    ketikan sungguhan -- keterbatasan yang sama persis dengan
+    verifikasi ketikan/klik yang sudah dicatat berulang kali di
+    ROADMAP.md. Regex dan posisi replacement dikonfirmasi benar secara
+    terpisah (`\sec` -> `\section`) lewat review manual sebelum commit.
+  - **Ditemukan dan diperbaiki lewat code review sebelum commit**: draf
+    awal `latexCompletions` menyalin guard `word.from === word.to &&
+    !context.explicit` dari pola contoh resmi `@codemirror/autocomplete`
+    (biasanya dipakai dengan regex yang boleh cocok string kosong, mis.
+    `/\w*/`, di situ `context.explicit` berarti "Ctrl+Space walau belum
+    ngetik apa-apa") -- TAPI regex di sini (`/\\[a-zA-Z]*/`) mewajibkan
+    backslash LITERAL, jadi `matchBefore` cuma mengembalikan match
+    non-null yang PANJANGNYA MINIMAL 1 (backslash-nya sendiri), tidak
+    pernah zero-length. Guard itu jadi dead code -- kondisinya mustahil
+    true, tidak salah secara perilaku (autocomplete tetap jalan normal),
+    cuma komentarnya menyiratkan ada logic `context.explicit` yang
+    sebenarnya tidak pernah tereksekusi. Dihapus, komentar fungsi ditulis
+    ulang untuk menjelaskan kenapa `context.explicit` TIDAK relevan di
+    sini, bukan cuma menghapus tanpa penjelasan.
+
 - **Export PDF**: `app.go` menambah `ExportPDF(pdf []byte)` -- dialog
   native lokasi simpan, menulis lewat `atomicWriteFile` yang sama dengan
   `SaveDocument`, dilindungi `fileMu` yang sama juga. Menerima PDF

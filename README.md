@@ -13,7 +13,8 @@ dijalankan.
   bukan Electron/Chromium yang di-bundle terpisah (WebView2 bawaan Windows
   dipakai sebagai renderer).
 - **Frontend**: vanilla JS + [CodeMirror 6](https://codemirror.net/)
-  (syntax highlighting LaTeX lewat `@codemirror/legacy-modes/mode/stex`)
+  (syntax highlighting LaTeX lewat `@codemirror/legacy-modes/mode/stex`,
+  autocomplete perintah LaTeX lewat `@codemirror/autocomplete`)
   + `<iframe>` PDF bawaan WebView2 (Chromium) untuk preview -- TIDAK pakai
   PDF.js pada increment ini, penampil bawaan browser sudah cukup untuk
   preview sederhana.
@@ -106,6 +107,14 @@ sukses (bukan baca ulang dari disk -- selalu persis PDF yang sedang
 tampil di preview pane) ke lokasi pilihan operator. Nonaktif sampai ada
 compile yang sukses sama sekali.
 
+## Autocomplete
+
+Ketik `\` diikuti beberapa huruf untuk memunculkan saran perintah LaTeX
+umum (struktur dokumen, formatting, matematika dasar, referensi) --
+daftar statis pendek (`LATEX_COMMANDS` di `frontend/src/main.js`), BUKAN
+autocomplete yang sadar paket/`\usepackage`. Ctrl+Space memicu popup
+biar pun belum ada huruf setelah `\`.
+
 ## Batasan pada increment ini (lihat ROADMAP.md untuk detail)
 
 - **Satu dokumen, satu file** -- tidak ada multi-tab, tidak ada `\input`/
@@ -114,9 +123,10 @@ compile yang sukses sama sekali.
   disimpan** -- indikator titik di judul adalah satu-satunya sinyal.
 - Format PDF/JSON compile dan toolbar save/open/ekspor diverifikasi lewat
   build + screenshot aplikasi sungguhan, TAPI klik tombol Buka/Simpan/
-  Ekspor PDF lewat interaksi terprogram (koordinat mouse) belum berhasil
-  diverifikasi -- lihat CHANGELOG.md/ROADMAP.md untuk detail keterbatasan
-  otomasi GUI ini. `internal/tectonic` dan bagian `app.go` yang tidak
+  Ekspor PDF dan popup autocomplete lewat interaksi terprogram (koordinat
+  mouse/keystroke sintetis) belum berhasil diverifikasi -- lihat
+  CHANGELOG.md/ROADMAP.md untuk detail keterbatasan otomasi GUI ini.
+  `internal/tectonic` dan bagian `app.go` yang tidak
   butuh dialog (`SaveDocument`, `atomicWriteFile`, penolakan awal
   `ExportPDF`, lihat `app_test.go`) sudah punya unit test;
   `Ensure`/`Compile`/`OpenDocument`/`SaveDocumentAs`/`ExportPDF` (bagian

@@ -7,6 +7,57 @@ import {EventsOn} from '../wailsjs/runtime/runtime'
 
 const DEBOUNCE_MS = 900
 
+// LATEX_COMMANDS adalah daftar perintah LaTeX umum untuk autocomplete --
+// SENGAJA daftar statis pendek yang mencakup skenario paling sering
+// (struktur dokumen, formatting teks, matematika dasar, referensi/
+// bibliografi), BUKAN daftar lengkap semua perintah LaTeX/paket (yang
+// jumlahnya ribuan dan bergantung paket mana yang di-\usepackage --
+// autocomplete yang sadar-paket butuh parsing \usepackage dokumen dan
+// database perintah per paket, di luar cakupan increment ini).
+const LATEX_COMMANDS = [
+    '\\begin', '\\end',
+    '\\documentclass', '\\usepackage',
+    '\\title', '\\author', '\\date', '\\maketitle',
+    '\\section', '\\subsection', '\\subsubsection', '\\chapter', '\\part', '\\paragraph',
+    '\\textbf', '\\textit', '\\texttt', '\\emph', '\\underline',
+    '\\item', '\\label', '\\ref', '\\pageref', '\\cite', '\\footnote',
+    '\\includegraphics', '\\caption',
+    '\\newpage', '\\clearpage', '\\newline',
+    '\\frac', '\\sqrt', '\\sum', '\\int', '\\prod', '\\lim', '\\infty', '\\partial', '\\nabla',
+    '\\left', '\\right',
+    '\\times', '\\cdot', '\\pm', '\\leq', '\\geq', '\\neq', '\\approx', '\\equiv',
+    '\\alpha', '\\beta', '\\gamma', '\\delta', '\\epsilon', '\\theta', '\\lambda',
+    '\\mu', '\\pi', '\\sigma', '\\phi', '\\omega', '\\Delta', '\\Sigma', '\\Omega',
+]
+
+// latexCompletions adalah CompletionSource CodeMirror -- dipanggil setiap
+// posisi kursor berubah/karakter diketik, TAPI cuma mengembalikan hasil
+// (memicu popup) kalau kursor persis SETELAH backslash diikuti nol atau
+// lebih huruf (`\se`, `\`, dst.), bukan di sembarang posisi teks biasa.
+// Regex-nya MEWAJIBKAN backslash literal (bukan opsional), jadi
+// matchBefore SELALU mengembalikan null di posisi tanpa backslash
+// (ditangani `!word` di bawah) -- match yang tidak null PASTI punya
+// panjang >= 1 (backslash-nya sendiri), tidak pernah zero-length. Artinya
+// `context.explicit` (Ctrl+Space) TIDAK relevan di sini -- beda dari
+// contoh resmi @codemirror/autocomplete yang biasa dipakai dengan regex
+// match-kosong-boleh macam `/\w*/` (di situ `explicit` membedakan "user
+// eksplisit minta walau belum ngetik apa-apa"). Draf awal fungsi ini
+// sempat menyalin guard `word.from === word.to && !context.explicit`
+// dari pola itu tanpa disadari jadi dead code (kondisinya mustahil
+// true dengan regex yang mewajibkan backslash) -- dihapus di sini,
+// ditemukan lewat code review sebelum commit.
+function latexCompletions(context) {
+    const word = context.matchBefore(/\\[a-zA-Z]*/)
+    if (!word) {
+        return null
+    }
+    return {
+        from: word.from,
+        options: LATEX_COMMANDS.map((cmd) => ({label: cmd, type: 'keyword'})),
+        validFor: /^\\[a-zA-Z]*$/,
+    }
+}
+
 const DEFAULT_SOURCE = `\\documentclass{article}
 \\title{Dokumen Baru}
 \\author{}
@@ -189,11 +240,22 @@ function scheduleCompile(view) {
     }, DEBOUNCE_MS)
 }
 
+// stexLanguage dipisah jadi const (bukan inline di extensions[]) supaya
+// bisa dipakai lagi untuk mendaftarkan latexCompletions lewat
+// `.data.of(...)` -- ini cara resmi @codemirror/autocomplete menemukan
+// completion source PER BAHASA, TANPA perlu memanggil autocompletion()
+// kedua kalinya (basicSetup di bawah SUDAH memanggilnya sekali; facet
+// config-nya cuma mengambil pemanggilan PERTAMA, jadi menambah
+// autocompletion() lagi dengan override di sini justru DIABAIKAN diam-
+// diam, bukan digabung -- lihat dokumentasi @codemirror/autocomplete).
+const stexLanguage = StreamLanguage.define(stex)
+
 const view = new EditorView({
     doc: DEFAULT_SOURCE,
     extensions: [
         basicSetup,
-        StreamLanguage.define(stex),
+        stexLanguage,
+        stexLanguage.data.of({autocomplete: latexCompletions}),
         EditorView.updateListener.of((update) => {
             if (update.docChanged) {
                 if (!suppressDirty) {
