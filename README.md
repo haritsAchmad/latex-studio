@@ -172,3 +172,7 @@ biar pun belum ada huruf setelah `\`.
   ini (file itu tidak diubah sama sekali). Belum dicoba diperbaiki --
   dampaknya kosmetik (tab Properti file di luar installer), bukan
   fungsional.
+
+## Credits
+
+Library, program, font, dan aset pihak lain beserta lisensinya dicatat di [CREDITS.md](CREDITS.md).
