@@ -27,6 +27,25 @@ dijalankan.
   baru yang belum pernah dipakai; kompilasi berikutnya terhadap paket yang
   sama jalan offline.
 
+## Kebutuhan sistem
+
+Diukur 16 November 2026 di laptop pengembang: Windows 11 Home 64-bit, AMD
+Ryzen 5 7535HS (6 core, 12 thread), RAM 16 GB, layar 1920x1080. Exe hasil
+`wails build` dibuka 25 detik dengan dokumen bawaan: ~364 MB RAM (private)
+dari 9 proses -- `latex-studio.exe` 54 MB, sisanya proses WebView2. Kolom
+"Minimum" dihitung dari angka itu; belum dicoba di mesin yang lebih lemah.
+
+| | Minimum | Rekomendasi | Terukur di laptop uji |
+| --- | --- | --- | --- |
+| Sistem operasi | Windows 10/11 64-bit dengan WebView2 Runtime (bawaan Windows 11) | Windows 11 64-bit | Windows 11 Home 64-bit |
+| Prosesor | x64, 2 core | 4 core+ (kompilasi ulang otomatis tiap berhenti mengetik) | Ryzen 5 7535HS 6c/12t |
+| RAM | 1 GB kosong | 2 GB+ untuk dokumen besar | ~364 MB |
+| GPU | Tidak perlu (WebView2 memakai GPU bila ada) | -- | -- |
+| Disk kosong | ~200 MB: exe 11 MB (installer 6 MB) + Tectonic 69 MB + cache paket TeX | + cache paket TeX yang bertambah per paket baru | cache Tectonic 69 MB + paket 41 MB |
+| Layar | Layar berapa pun; dua panel (editor dan PDF) lebih lega mulai 1280 piksel lebar (belum diukur) | 1920x1080 | 1920x1080 |
+| Internet | Sekali saat pertama jalan (unduh Tectonic) dan sekali per paket TeX baru | -- | -- |
+| Build | Go (`go.mod`), Node.js + npm, C compiler (cgo untuk WebView2), Wails CLI v2 | -- | go1.26.1, Node 24.22.1 |
+
 ## Struktur
 
 ```text
